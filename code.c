@@ -9,13 +9,21 @@
 #include <errno.h>
 
 #define MAXLENGTH 100
+#define DEBUG 1
+
+void red() {
+  printf("\033[1;31m");
+}
+void reset () {
+  printf("\033[0m");
+}
 
 int changeDirectory(char *string){
 	chdir(string);
 	return 0;
 }
 
-int printDirectory(char *string){
+int printDirectory(){
 	char c[100];
 	getcwd(c,sizeof(c));
 	printf("current Working Directory: %s\n",c);
@@ -48,7 +56,7 @@ int countPipes(char* string){
 }
 
 char* removeSpaces(char* string){
-	puts("Inside remove Spaces");
+	
 	int i = 0;
 	int numChars = 0;
 	while(string[i] != '\0'){
@@ -110,93 +118,191 @@ char* getDescriptors(char* command,int* readEnd,int* writeEnd){
 	}
 	if(lessthan != -1){
 		*readEnd = open(&withoutSpaces[lessthan+1],O_RDONLY);
+		if(DEBUG){
+			red();
+			printf("\t\tOpened readEnd *%s*\n",&withoutSpaces[lessthan+1]);
+			reset();
+		}
 	}
 	if(greaterthan != -1){
-		*writeEnd = open(&withoutSpaces[greaterthan+1],O_WRONLY | O_CREAT);
-		puts("Opened the file required");
-		dup2(*writeEnd,1);
-		puts("There you are!!!");
-		close(1);
+		*writeEnd = open(&withoutSpaces[greaterthan+1],O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IRGRP | S_IWGRP | S_IWUSR);
+		if(DEBUG){
+			red();
+			printf("\t\tOpened writeEnd *%s*\n",&withoutSpaces[greaterthan+1]);
+			reset();
+		}
+
 	}
 	return strdup(withoutSpaces);
 	
 }
 void execute(char* command,int readEnd,int writeEnd){
+ 	
+ 	int std_output = dup(1);
+ 	int std_input  = dup(0);
+
+ 	if(DEBUG){
+ 		red();
+ 		printf("\tExecuting execute Function\n");
+ 		reset();
+ 	}
  	int pid = fork();
  	
  	// Here command is the name of the executable not the whole command.
 
  	if(pid == 0){
  		//dup2(writeEnd,STDOUT_FILENO);
+ 		
+ 		reset();
+ 		
+ 		
+
+
  		dup2(readEnd,0);
+ 		dup2(writeEnd,1);
+
+
+ 		
  		char* array[] = {command,NULL};
- 		puts("Tharun is great");
+ 		
+
  		execvp(array[0],array);
  	}
  	else{
 
  		wait(NULL);
- 		puts("\nChild process terminated!!!");
 
+ 		if(DEBUG){
+ 			red();
+ 			printf("\n\t\tChild Process Terminated\n");
+ 			reset();
+ 		}
+ 		
+ 		close(readEnd);
+ 		close(writeEnd);
+
+ 		dup2(std_output,STDOUT_FILENO);
+ 		dup2(std_input,STDIN_FILENO);
  	}
 }
 void parseExecutable(char* string){
+	if(DEBUG){
+		red();
+		printf("\tExecuting parseExecutable Function\n");
+		
+	}
 	char* withoutSpaces = removeSpaces(string);
+	
 	int pipes = countPipes(withoutSpaces);
+	
+	if(DEBUG){
+		printf("\t\tAfter removing space *%s*\n",withoutSpaces);
+		printf("\t\tNumber of pipes : %d\n",pipes);
+		reset();
+	}
+
 	if(pipes == 0){
-		puts("zero pipes");
+		
 		int readEnd = 0,writeEnd = 1;
 		char* executableName = getDescriptors(withoutSpaces,&readEnd,&writeEnd);
 		
 		if(readEnd < 0)readEnd = 0;
 		if(writeEnd < 0)writeEnd = 1;
-		printf("ReadEnd %d WriteEnd %d\n",readEnd,writeEnd);
+
+		if(DEBUG){
+			red();
+			printf("\t\tRead :%d,Write :%d,Executable :*%s*\n",readEnd,writeEnd,executableName);
+			reset();
+		}
+
 		execute(executableName,readEnd,writeEnd);
 
 	}
 	else if(pipes == 1){
-		puts("1 pipe");
+
 	}
 	else{
 		puts("more than 1 pipe");
 	}
 }
-// cd
-// pwd
-// rmdir
-// mkdir
-// exit
+
+
+
 int runCommand(char* string){
+	if(DEBUG){
+		red();
+		printf("\tExecuting runCommand Function\n");
+		reset();
+	}
 	char* command = strdup(string);
 	char* token = strtok(command," ");
 
 	if(strcmp(token,"cd") == 0){
-		puts("Cd");
 		token = strtok(NULL," ");
+
+		if(DEBUG){
+			red();
+			printf("\t\tChange Directory Token, Dir: *%s*\n",token);
+			reset();
+		}
+
 		changeDirectory(token);
+
 	}
 	else if(strcmp(token,"pwd") == 0){
-		puts("pwd");
+		
+		if(DEBUG){
+			red();
+			printf("\t\tPrint Current Directory\n");
+			reset();
+		}
+
 		token = strtok(NULL," ");
-		printDirectory(token);
+		printDirectory();
 	}
 	else if(strcmp(token,"rmdir") == 0){
-		puts("rmdir");
+		
 		token = strtok(NULL," ");
+
+		if(DEBUG){
+			red();
+			printf("\t\tRemove Directory Token, Dir : *%s*\n",token);
+			reset();
+		}
+
 		removeDirectory(token);
 	}
 	else if(strcmp(token,"mkdir") == 0){
-		puts("mkdir");
+		
 		token = strtok(NULL," ");
+		
+		if(DEBUG){
+			red();
+			printf("\t\tMake Directory Token, Dir : *%s*\n",token);
+			reset();
+		}
+
 		makeDirectory(token);
 	}
 	else if(strcmp(token,"exit") == 0){
-		puts("Exit");
+
+		if(DEBUG){
+			red();
+			printf("\t\tExit Token\n");
+			reset();
+		}
+		
 		return 0;
 	}
 	else{
-		puts("executable");
-		int i = 0;
+		if(DEBUG){
+			red();
+			printf("\t\tUnkown Token\n");
+			reset();
+		}
+
+
+	
 		parseExecutable(string);
 	}
 	return 1;
@@ -214,7 +320,11 @@ int main(){
 			i++;
 		command[i] = '\0';
 
-
+		if(DEBUG){
+			red();
+			printf("\tReceived Command : *%s*\n",command);
+			reset();
+		}
 		running = runCommand(command);
 	}
 }
