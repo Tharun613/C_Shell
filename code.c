@@ -178,8 +178,6 @@ void execute(char* command,int readEnd,int writeEnd){
  			reset();
  		}
  		
- 		close(readEnd);
- 		close(writeEnd);
 
  		dup2(std_output,STDOUT_FILENO);
  		dup2(std_input,STDIN_FILENO);
@@ -218,11 +216,72 @@ void parseExecutable(char* string){
 		execute(executableName,readEnd,writeEnd);
 
 	}
-	else if(pipes == 1){
-
-	}
 	else{
-		puts("more than 1 pipe");
+		char* c = strdup(string);
+		char* token = strtok(c,"|");
+
+		int pipe1[2],pipe2[2];
+		if(pipe(pipe1) == -1){
+			puts("PIPE1 CREATION FAILED!!!");
+		}
+		if(pipe(pipe2) == -1){
+			puts("PIPE2 CREATION FAILED!!!");
+		}
+
+		//THIS BLOCK EXECUTES START
+		int readEnd,writeEnd;
+		char* withoutSpaces = removeSpaces(token);
+		char* executableName = getDescriptors(withoutSpaces,&readEnd,&writeEnd);
+		writeEnd = pipe1[1];
+		if(readEnd < 0)readEnd = 0;
+		if(DEBUG){
+			red();
+			printf("\t\tStart: writeEnd - %d,readEnd - %d,executable - *%s*\n",writeEnd,readEnd,executableName);
+			reset();
+		}
+
+
+		execute(executableName,readEnd,writeEnd);
+
+		//THIS BLOCK EXECUTES MIDDLE
+		for(int i = 0;i<pipes-1;i++){
+
+			token = strtok(NULL,"|");
+			withoutSpaces = removeSpaces(token);
+			if(DEBUG){
+				red();
+				printf("\t\ti: %d,withoutSpaces: *%s*\n",i,withoutSpaces);
+				reset();
+			}
+
+			if(i%2 == 0){
+				execute(withoutSpaces,pipe1[0],pipe2[1]);
+			}
+			else{
+				execute(withoutSpaces,pipe2[0],pipe1[1]);
+			}
+		}
+
+		//THIS BLOCK EXECUTES END
+		token = strtok(NULL,"|");
+		withoutSpaces = removeSpaces(token);
+		
+		executableName = getDescriptors(withoutSpaces,&readEnd,&writeEnd);
+		if(writeEnd < 0)writeEnd = 1;
+
+		if(DEBUG){
+			red();
+			printf("\t\texecutableName: *%s*,readEnd - %d,writeEnd - %d\n",executableName,readEnd,writeEnd);
+			reset();
+		}
+		if(pipes%2==0){
+			close(pipe2[1]);
+			execute(executableName,pipe2[0],writeEnd);
+		}
+		else{
+			close(pipe1[1]);
+			execute(executableName,pipe1[0],writeEnd);
+		}
 	}
 }
 
@@ -328,3 +387,26 @@ int main(){
 		running = runCommand(command);
 	}
 }
+/*
+
+	start | middle | end
+
+	start may have an input file  but wont have an output
+
+	middle will neither have an input nor an output
+
+	end might have output file but no input
+
+
+	middle = number of pipes - 1
+
+	start sends the output to pipe1
+
+	middle[1] reads input from pipe1
+
+	and writes it to pipe2
+
+	middle[2] reads input from pipe2
+	and writes it to pipe1
+
+*/
